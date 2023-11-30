@@ -12,8 +12,9 @@ class Favicon implements Comparable<Favicon> {
   String url;
   int width;
   int height;
+  String title;
 
-  Favicon(this.url, {this.width = 0, this.height = 0});
+  Favicon(this.url, {this.width = 0, this.height = 0, this.title = ""});
 
   @override
   int compareTo(Favicon other) {
@@ -42,8 +43,7 @@ class Favicon implements Comparable<Favicon> {
 }
 
 class FaviconFinder {
-  static Future<List<Favicon>> getAll(
-    String url, {
+  static Future<List<Favicon>> getAll(String url, {
     List<String>? suffixes,
   }) async {
     var favicons = <Favicon>[];
@@ -51,6 +51,12 @@ class FaviconFinder {
 
     var uri = Uri.parse(url);
     var document = parse((await http.get(uri)).body);
+
+    String title = "";
+    final titleElement = document.querySelector('title');
+    if (titleElement != null) {
+      title = titleElement.text;
+    }
 
     // Look for icons in tags
     for (var rel in ['icon', 'shortcut icon']) {
@@ -74,7 +80,9 @@ class FaviconFinder {
           }
 
           // Remove query strings
-          iconUrl = iconUrl.split('?').first;
+          iconUrl = iconUrl
+              .split('?')
+              .first;
 
           // Verify so the icon actually exists
           if (await _verifyImage(iconUrl)) {
@@ -95,28 +103,32 @@ class FaviconFinder {
 
     // Filter on suffixes
     if (suffixes != null) {
-      iconUrls.removeWhere((url) => !suffixes.contains(url.split('.').last));
+      iconUrls.removeWhere((url) =>
+      !suffixes.contains(url
+          .split('.')
+          .last));
     }
 
     // Fetch dimensions
     for (var iconUrl in iconUrls) {
       // No need for size calculation on vector images
       if (iconUrl.endsWith('.svg')) {
-        favicons.add(Favicon(iconUrl));
+        favicons.add(Favicon(iconUrl, title: title));
         continue;
       }
 
       // Image library lacks read support for Ico, assume standard size
       // https://github.com/brendan-duncan/image/issues/212
       if (iconUrl.endsWith('.ico')) {
-        favicons.add(Favicon(iconUrl, width: 16, height: 16));
+        favicons.add(Favicon(iconUrl, width: 16, height: 16, title: title));
         continue;
       }
 
       var image = decodeImage((await http.get(Uri.parse(iconUrl))).bodyBytes);
       if (image != null) {
         favicons
-            .add(Favicon(iconUrl, width: image.width, height: image.height));
+            .add(Favicon(
+            iconUrl, width: image.width, height: image.height, title: title));
       }
     }
 
